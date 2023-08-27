@@ -1,0 +1,51 @@
+version: "3"
+services:
+  postgres:
+    image: "postgres:14.6"
+    environment:
+      - POSTGRES_USER=testcomposeuser
+      - POSTGRES_PASSWORD=Test@123
+      - POSTGRES_DB=fibodb
+  redis:
+    image: "redis:6.2"
+
+  server:
+    image: "fibo-server:latest"
+    container_name: fibo-server
+    build:
+      context: ./fibo-server
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PG_USER=testcomposeuser
+      - PG_HOST=postgres
+      - PG_DATABASE=fibodb
+      - PG_PASSWORD=Test@123
+      - PG_PORT=5432
+    ports:
+      - "5000:5000"
+    restart: always # TODO: find alternative way to wait for Postgres to be healthy before server starts
+    depends_on:
+      - postgres
+      - redis
+
+  client:
+    image: "fibo-client:latest"
+    container_name: fibo-client
+    build:
+      context: ./fibo-client
+    ports:
+      - "3000:3000"
+    depends_on:
+      - server
+
+  worker:
+    image: "fibo-worker:latest"
+    container_name: fibo-worker
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    build:
+      context: ./fibo-worker
+    depends_on:
+      - redis
