@@ -1,0 +1,31 @@
+apiVersion: skaffold/v3
+kind: Config
+metadata:
+  name: golang-fibo
+build:
+  local:
+    push: false
+  artifacts:
+    - image: fibo-client
+      context: fibo-client
+      docker:
+        dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: "**/*.js"
+            dest: .
+          - src: "**/*.css"
+            dest: .
+          - src: "**/*.html"
+            dest: .
+    - image: fibo-server
+      context: fibo-server
+      docker:
+        dockerfile: Dockerfile
+    - image: fibo-worker
+      context: fibo-worker
+      docker:
+        dockerfile: Dockerfile
+manifests:
+  rawYaml:
+    - ./fibo-k8s/*

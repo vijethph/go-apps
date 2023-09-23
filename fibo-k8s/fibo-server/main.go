@@ -39,6 +39,8 @@ func init() {
 		DB:              0,  // use default DB
 	})
 
+	time.Sleep(5 * time.Second) // wait for postgres container to start
+
 	dbPoolClient, commonErr = pgxpool.New(ctx, fmt.Sprintf("postgres://%s:%s@%s:%s/%s", pgUser, pgPassword, pgHost, pgPort, pgDatabase))
 	if commonErr != nil {
 		log.Error().Err(commonErr).Msg("Unable to create connection pool")
