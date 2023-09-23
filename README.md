@@ -16,7 +16,7 @@
 <h3 align="center">Go Apps</h3>
 
   <p align="center">
-    Collection of things built following Go Course
+    Collection of things built following Go and Kubernetes tutorials
     <br />
     <br />
     <a href="https://github.com/vijethph/go-apps/issues">Report Bug</a>
@@ -37,6 +37,14 @@
         <li><a href="#built-with">Built With</a></li>
       </ul>
     </li>
+    <li>
+      <a href="#getting-started">Getting Started</a>
+      <ul>
+        <li><a href="#deploy-using-minikube">Deploy using minikube</a></li>
+        <li><a href="#deploy-using-skaffold">Deploy using Skaffold</a></li>
+        <li><a href="#teardown-for-locally-created-resources">Teardown for locally created resources</a></li>
+      </ul>
+    </li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
@@ -49,16 +57,79 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-Collection of things built following Go Course
+Collection of things built following Go and Kubernetes tutorials
 
 
 ### Built With
 
 * [![Go][Go]][go-url]
+* [![Docker][Docker]][docker-url]
+* [![Kubernetes][Kubernetes]][kubernetes-url]
 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+<!-- GETTING STARTED -->
+## Getting Started
+
+The repository has multiple branches for `fibo-k8s` app based on deployment methods. 
+
+- `main` branch contains files that can be run using Docker Compose (`docker-compose up`)
+- `minikube-skaffold` branch contains files that can be run using minikube or Skaffold
+
+### Deploy using minikube
+
+1. Install kubectl and minikube. Then run these commands in order:
+  ```bash
+  minikube start
+
+  minikube addons enable ingress
+
+  kubectl cluster-info
+  ```
+2. Now, switch to minikube's docker daemon, as minikube runs in VM, and cannot use local images on its own. So, all docker images need to be built within minikube's docker daemon. Then, deploy the kubernetes cluster
+  ```bash
+  eval $(minikube docker-env)
+
+  # docker build all images after above command
+
+  kubectl create secret generic pgpassword --from-literal PG_PASSWORD=Test@123
+
+  kubectl apply -f fibo-k8s
+
+  kubectl get pods --watch
+
+  minikube ip
+  ```
+3. Open the IP address provided by minikube in a browser to access the application. 
+
+### Deploy using Skaffold
+
+1. Follow the steps 1 and 2 from minikube deployment with certain changes:
+  ```bash
+  # instead of "kubectl apply -f k8s", run the following command
+  
+  skaffold dev # or skaffold run
+
+  minikube ip
+  ```
+2. Open the IP address provided by minikube in a browser to access the application. 
+
+### Teardown for locally created resources
+```bash
+kubectl delete -f fibo-k8s
+
+skaffold delete
+
+minikube stop
+
+minikube delete --all
+
+# switch back to normal docker daemon
+eval $(minikube docker-env -u)
+```
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- CONTRIBUTING -->
 ## Contributing
@@ -123,3 +194,7 @@ Project Link: [https://github.com/vijethph/go-apps](https://github.com/vijethph/
 [issues-url]: https://github.com/vijethph/go-apps/issues
 [Go]: https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white
 [go-url]: https://go.dev/doc/
+[Docker]: https://img.shields.io/badge/Docker-2CA5E0?style=for-the-badge&logo=docker&logoColor=white
+[docker-url]: https://docs.docker.com/
+[Kubernetes]: https://img.shields.io/badge/kubernetes-326ce5.svg?&style=for-the-badge&logo=kubernetes&logoColor=white
+[kubernetes-url]: https://kubernetes.io/docs/home/
