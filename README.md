@@ -43,6 +43,7 @@
         <li><a href="#deploy-using-minikube">Deploy using minikube</a></li>
         <li><a href="#deploy-using-skaffold">Deploy using Skaffold</a></li>
         <li><a href="#teardown-for-locally-created-resources">Teardown for locally created resources</a></li>
+        <li><a href="#deploy-to-eks">Deploy to EKS</a></li>
       </ul>
     </li>
     <li><a href="#contributing">Contributing</a></li>
@@ -76,6 +77,7 @@ The repository has multiple branches for `fibo-k8s` app based on deployment meth
 
 - `main` branch contains files that can be run using Docker Compose (`docker-compose up`)
 - `minikube-skaffold` branch contains files that can be run using minikube or Skaffold
+- `eks-with-nlb` branch contains files that can be deployed to AWS Elastic Kubernetes Service (EKS)
 
 ### Deploy using minikube
 
@@ -128,6 +130,45 @@ minikube delete --all
 # switch back to normal docker daemon
 eval $(minikube docker-env -u)
 ```
+
+### Deploy to EKS
+
+Run the following commands with AWS CLI (using required credentials) or within AWS CloudShell
+1. Install kubectl (v1.23.6), eksctl and helm.
+2. Create EKS cluster with necessary resources (which takes up to 15-20 minutes)
+  ```
+  eksctl create cluster --name test-cluster --node-type t2.small --nodes 3 --nodes-min 3 --nodes-max 6 --region us-east-1
+  ```
+3. Create OIDC provider for the cluster, IAM service account and Amazon EBS CSI driver for the Persistent Volume Claim
+  <code>
+  eksctl create iamserviceaccount --region us-east-1 --name ebs-csi-controller-sa --namespace kube-system --cluster test-cluster --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy --approve --role-only --role-name AmazonEKS_EBS_CSI_DriverRole
+
+  eksctl create addon --name aws-ebs-csi-driver --cluster test-cluster --service-account-role-arn arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/AmazonEKS_EBS_CSI_DriverRole --force
+  </code>
+
+4. Build and push Docker images in `fibo-client`, `fibo-server` and `fibo-worker` folders to a pre-created ECR repository. Update the respective deployment files in `fibo-k8s` folder to reference the published images
+5. Create a secret using kubectl to store database password. Install ingress-nginx controller for Network Load Balancer (NLB) and finally deploy the app to EKS
+  ```
+  kubectl create secret generic pgpassword --from-literal PG_PASSWORD=Test@123
+
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/aws/deploy.yaml
+
+  kubectl apply -f fibo-k8s
+  ```
+6. Get the DNS name of NLB and open it in a new browser window to use the deployed application
+  ```
+  kubectl get services --namespace=ingress-nginx
+  ```
+6. [Optional] Delete all the created resources by running the following commands
+  ```
+  kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/aws/deploy.yaml
+
+  kubectl delete -f fibo-k8s
+
+  eksctl delete cluster --name test-cluster --region us-east-1
+
+  eksctl delete iamserviceaccount --name ebs-csi-controller-sa --region us-east-1
+  ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

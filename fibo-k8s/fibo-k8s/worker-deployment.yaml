@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: worker
-          image: "fibo-worker:latest"
+          image: "fibo-worker:latest" # update image reference here
           imagePullPolicy: IfNotPresent
           env:
             - name: REDIS_HOST

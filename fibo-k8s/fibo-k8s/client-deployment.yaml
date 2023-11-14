@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: client
-          image: fibo-client:latest
+          image: fibo-client:latest # update image reference here
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
