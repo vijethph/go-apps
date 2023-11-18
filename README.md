@@ -43,8 +43,7 @@
         <li><a href="#deploy-using-minikube">Deploy using minikube</a></li>
         <li><a href="#deploy-using-skaffold">Deploy using Skaffold</a></li>
         <li><a href="#teardown-for-locally-created-resources">Teardown for locally created resources</a></li>
-        <li><a href="#deploy-to-eks">Deploy to EKS</a></li>
-        <li><a href="#deploy-to-aks">Deploy to AKS</a></li>
+        <li><a href="#deploy-to-gke">Deploy to GKE</a></li>
       </ul>
     </li>
     <li><a href="#contributing">Contributing</a></li>
@@ -79,6 +78,7 @@ The repository has multiple branches for `fibo-k8s` app based on deployment meth
 - `main` branch contains files that can be run using Docker Compose (`docker-compose up`)
 - `minikube-skaffold` branch contains files that can be run using minikube or Skaffold
 - `eks-aks` branch contains files that can be deployed to AWS Elastic Kubernetes Service (EKS) or Azure Kubernetes Service (AKS)
+- `gke-with-nginx` branch contains files that can be deployed to Google Kubernetes Engine (GKE)
 
 ### Deploy using minikube
 
@@ -132,75 +132,54 @@ minikube delete --all
 eval $(minikube docker-env -u)
 ```
 
-### Deploy to EKS
+### Deploy to GKE
 
-Run the following commands with AWS CLI (using required credentials) or within AWS CloudShell
-1. Install kubectl (v1.23.6), eksctl and helm.
-2. Create EKS cluster with necessary resources (which takes up to 15-20 minutes)
+1. Enable Artifact Registry API and create a repository named `testrepo`
+2. Enable Kubernetes Engine API. Create GKE cluster with necessary resources (which takes up to 15-20 minutes)
   ```
-  eksctl create cluster --name test-cluster --node-type t2.small --nodes 3 --nodes-min 3 --nodes-max 6 --region us-east-1
-  ```
-3. Create OIDC provider for the cluster, IAM service account and Amazon EBS CSI driver for the Persistent Volume Claim
-  ```
-  eksctl create iamserviceaccount --region us-east-1 --name ebs-csi-controller-sa --namespace kube-system --cluster test-cluster --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy --approve --role-only --role-name AmazonEKS_EBS_CSI_DriverRole
+  gcloud auth login
 
-  eksctl create addon --name aws-ebs-csi-driver --cluster test-cluster --service-account-role-arn arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/AmazonEKS_EBS_CSI_DriverRole --force
+  gcloud beta container clusters create "test-cluster" --no-enable-basic-auth --cluster-version "1.27.3-gke.100" --release-channel "regular" --machine-type "e2-medium" --image-type "COS_CONTAINERD" --disk-type "pd-standard" --disk-size "50" --metadata disable-legacy-endpoints=true --scopes "https://www.googleapis.com/auth/devstorage.read_only","https://www.googleapis.com/auth/logging.write","https://www.googleapis.com/auth/monitoring","https://www.googleapis.com/auth/servicecontrol","https://www.googleapis.com/auth/service.management.readonly","https://www.googleapis.com/auth/trace.append" --num-nodes "3" --logging=SYSTEM,WORKLOAD --monitoring=SYSTEM --enable-ip-alias --no-enable-intra-node-visibility --default-max-pods-per-node "110" --security-posture=standard --workload-vulnerability-scanning=disabled --no-enable-master-authorized-networks --addons HorizontalPodAutoscaling,HttpLoadBalancing,GcePersistentDiskCsiDriver --enable-autoupgrade --enable-autorepair --max-surge-upgrade 1 --max-unavailable-upgrade 0 --binauthz-evaluation-mode=DISABLED --no-enable-managed-prometheus --enable-shielded-nodes --node-locations "us-east1-d" --location us-east1
   ```
+3. Install kubectl and Helm if GCP Cloud Shell is used to create resources
+  ```
+  gcloud components install kubectl
 
-4. Build and push Docker images in `fibo-client`, `fibo-server` and `fibo-worker` folders to a pre-created ECR repository. Update the respective deployment files in `fibo-k8s` folder to reference the published images
-5. Create a secret using kubectl to store database password. Install ingress-nginx controller for Network Load Balancer (NLB) and finally deploy the app to EKS
+  curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+  
+  chmod 700 get_helm.sh
+
+  ./get_helm.sh
+  ```
+4. Build and push Docker images in `fibo-client`, `fibo-server` and `fibo-worker` folders to the Artifact Registry repository. Update the respective deployment files in `fibo-k8s` folder to reference the published images
+5. Create a secret using kubectl to store database password. Install ingress-nginx controller for Network Load Balancer (NLB)
+  ```
+  gcloud container clusters get-credentials test-cluster --zone us-east-1
+
+  kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user $(gcloud config get-value account)
+
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/aws/deploy.yaml
+  ```
+6. Create a secret using kubectl to store database password. Deploy the app to GKE
   ```
   kubectl create secret generic pgpassword --from-literal PG_PASSWORD=Test@123
 
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/aws/deploy.yaml
-
   kubectl apply -f fibo-k8s
   ```
-6. Get the DNS name of NLB and open it in a new browser window to use the deployed application
+7. Get the external IP address of service, and open it in a new browser window to use the deployed application  
   ```
   kubectl get services --namespace=ingress-nginx
   ```
-7. [Optional] Delete all the created resources by running the following commands
+8. [Optional] Delete all the created resources by running the following commands
   ```
   kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/aws/deploy.yaml
 
   kubectl delete -f fibo-k8s
 
-  eksctl delete cluster --name test-cluster --region us-east-1
-
-  eksctl delete iamserviceaccount --name ebs-csi-controller-sa --region us-east-1
+  gcloud container clusters delete test-cluster --location us-east1
   ```
 
-### Deploy to AKS
-
-Run the following commands with Azure CLI (using required credentials) or within Azure CloudShell
-1. Install kubectl (v1.23.6), eksctl and helm.
-2. Create AKS cluster with necessary resources (which takes up to 15-20 minutes)
-  ```
-  az aks create -g myResourceGroup -n myAKSCluster --enable-managed-identity --node-count 3 --max-count 3 --min-count 3 --os-sku Ubuntu
-  ```
-3. Build and push Docker images in `fibo-client`, `fibo-server` and `fibo-worker` folders to a pre-created ACR repository or a public Docker registry. Update the respective deployment files in `fibo-k8s` folder to reference the published images
-4. Create a secret using kubectl to store database password. Install ingress-nginx controller for Network Load Balancer (NLB) and finally deploy the app to EKS
-  ```
-  kubectl create secret generic pgpassword --from-literal PG_PASSWORD=Test@123
-
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/aws/deploy.yaml
-
-  kubectl apply -f fibo-k8s
-  ```
-5. Get the external IP address of service, and open it in a new browser window to use the deployed application
-  ```
-  kubectl get services --namespace=ingress-nginx
-  ```
-6. [Optional] Delete all the created resources by running the following commands
-  ```
-  kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/aws/deploy.yaml
-
-  kubectl delete -f fibo-k8s
-
-  az aks delete -g myResourceGroup -n myAKSCluster
-  ```
-
+**Alternative Method**: configure necessary credentials in GitHub repository secrets, complete steps 1 and 2 above and run the GitHub Actions workflow defined in this repository.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

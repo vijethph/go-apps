@@ -1,0 +1,80 @@
+name: Build and Deploy Docker Images to Artifact Registry
+
+on:
+  push:
+    branches:
+      - fibo-k8s
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Authenticate with Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Build and push Docker images
+        env:
+          GCP_ARTIFACT_REGISTRY: ${{ secrets.GCP_ARTIFACT_REGISTRY }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          gcloud auth configure-docker $GCP_ARTIFACT_REGISTRY
+          for dir in */; do
+            if [[ "$dir" != ".github/" && "$dir" != "fibo-k8s/" ]]; then
+              tag=$(echo $dir | tr -d '/')
+              docker build -t $GCP_ARTIFACT_REGISTRY/$GCP_PROJECT_ID/testrepo/$tag:latest $dir
+              docker push $GCP_ARTIFACT_REGISTRY/$GCP_PROJECT_ID/testrepo/$tag:latest
+            fi
+          done
+
+      - name: Install kubectl and helm
+        run: |
+          sudo apt-get install -y kubectl
+          curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+          chmod 700 get_helm.sh
+          ./get_helm.sh
+
+      - name: Get GKE credentials
+        id: get-gke-credentials
+        uses: google-github-actions/get-gke-credentials@v1
+        with:
+          cluster_name: test-cluster
+          location: us-east1-d
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Create clusterrolebinding
+        run: |
+          kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-admin --user=$(gcloud config get-value account)
+
+      - name: Install ingress-nginx controller
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
+
+      - name: Deploy app to GKE
+        env:
+          FIBO_CLIENT_IMAGE: ${{ secrets.GCP_ARTIFACT_REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/testrepo/fibo-client:latest
+          FIBO_SERVER_IMAGE: ${{ secrets.GCP_ARTIFACT_REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/testrepo/fibo-server:latest
+          FIBO_WORKER_IMAGE: ${{ secrets.GCP_ARTIFACT_REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/testrepo/fibo-worker:latest
+        run: |
+          cd fibo-k8s
+          for file in *.yaml; do
+            if [[ $file == *"deployment.yaml" ]]; then
+              envsubst < $file > $file.tmp && mv $file.tmp $file
+            fi
+          done
+          kubectl create secret generic pgpassword --from-literal PG_PASSWORD=Test@123
+          kubectl apply -f .
+          # kubectl delete -f .
+
