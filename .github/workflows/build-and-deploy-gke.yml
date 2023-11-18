@@ -3,7 +3,7 @@ name: Build and Deploy Docker Images to Artifact Registry
 on:
   push:
     branches:
-      - fibo-k8s
+      - gke-with-nginx
 
 jobs:
   build-and-deploy:
