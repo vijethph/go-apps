@@ -72,10 +72,12 @@ Collection of things built following Go and Kubernetes tutorials
 <!-- GETTING STARTED -->
 ## Getting Started
 
-The repository has multiple branches for `fibo-k8s` app based on deployment methods. 
+The repository has multiple branches for `fibo-k8s` app based on deployment methods. Instructions for deployments are mentioned in respective branches.
 
 - `main` branch contains files that can be run using Docker Compose (`docker-compose up`)
 - `minikube-skaffold` branch contains files that can be run using minikube or Skaffold
+- `eks-aks` branch contains files that can be deployed to AWS Elastic Kubernetes Service (EKS) or Azure Kubernetes Service (AKS)
+- `gke-with-nginx` branch contains files that can be deployed to Google Kubernetes Engine (GKE) using GitHub Actions
 
 ### Deploy using minikube
 
