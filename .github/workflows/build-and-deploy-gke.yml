@@ -52,7 +52,7 @@ jobs:
         uses: google-github-actions/get-gke-credentials@v1
         with:
           cluster_name: test-cluster
-          location: us-east1-d
+          location: us-east1
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Create clusterrolebinding
