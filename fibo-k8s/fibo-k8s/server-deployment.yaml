@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: server
-          image: "fibo-server:latest" # update image reference here
+          image: $FIBO_SERVER_IMAGE # update image reference here
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5000
