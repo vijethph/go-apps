@@ -31,6 +31,7 @@ jobs:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         run: |
           gcloud auth configure-docker $GCP_ARTIFACT_REGISTRY
+          cd fibo-k8s
           for dir in */; do
             if [[ "$dir" != ".github/" && "$dir" != "fibo-k8s/" ]]; then
               tag=$(echo $dir | tr -d '/')
@@ -68,7 +69,7 @@ jobs:
           FIBO_SERVER_IMAGE: ${{ secrets.GCP_ARTIFACT_REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/testrepo/fibo-server:latest
           FIBO_WORKER_IMAGE: ${{ secrets.GCP_ARTIFACT_REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/testrepo/fibo-worker:latest
         run: |
-          cd fibo-k8s
+          cd fibo-k8s/fibo-k8s
           for file in *.yaml; do
             if [[ $file == *"deployment.yaml" ]]; then
               envsubst < $file > $file.tmp && mv $file.tmp $file
